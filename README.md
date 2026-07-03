@@ -1,7 +1,7 @@
 # 都道府県大戦 — Prefecture Wars (remake)
 
 A clean-room, open-source remake of the Flash strategy game **都道府県大戦** in
-**Unity 6 LTS**, targeting Android (iOS optional). Built as a learning + portfolio project:
+**Unity 6.0 LTS**, targeting Android (iOS optional). Built as a learning + portfolio project:
 "Unity from zero to phone", end to end.
 
 - Code: **MIT**.
@@ -18,10 +18,12 @@ A clean-room, open-source remake of the Flash strategy game **都道府県大戦
 | Clean-room spec (CSVs + calibration guide) | ✅ done |
 | MVP plan + pseudo-code | ✅ done |
 | **Game.Core — pure-C# strategic layer** | ✅ implemented + tested (TDD) |
-| Pre-Unity `dotnet test` harness | ✅ 29 tests green |
-| Unity project scaffold (asmdefs + Test Runner) | ✅ done — 29 tests green in EditMode too |
+| Pre-Unity `dotnet test` harness | ✅ 40 tests green |
+| Unity project scaffold (asmdefs + Test Runner) | ✅ done — tests green in EditMode too |
 | First scene bootstrap (Unity `IRandom`/`IGameLogger`, turn loop) | ✅ done — verify in-Editor (see below) |
-| Map view (PrefectureDef SOs, clickable prefectures) | ⏳ next |
+| AdjacencyLoader — 47-prefecture map from CSV (symmetry + confirmed deviations) | ✅ done — TDD, real CSV verified |
+| **Downgrade Unity 6.5 → 6.0 LTS** | ⏳ in progress — see [docs/unity-6.0-downgrade.md](docs/unity-6.0-downgrade.md) |
+| Map view (PrefectureDef SOs, clickable prefectures) | ⬜ next |
 | Presentation layer (BattleView, UI, object pool) | ⬜ not started |
 | Android build (IL2CPP + ARM64) | ⬜ not started |
 
@@ -34,8 +36,11 @@ tested before the Unity project even exists:
 - Invasion resolver (MVP-0 number-compare), hire, reinforce (adjacency + 25-unit cap).
 - Injected `IRandom` / `IGameLogger` ports → deterministic, replayable simulation.
 - Simple AI + a full **AI-vs-AI smoke test** running a 5-prefecture map to unification.
+- `AdjacencyLoader`: parses `docs/adjacency_draft.csv` → 47-prefecture graph, enforces
+  symmetry, applies the 確認 in-game deviations (大阪–香川 add, 山口–福岡 remove,
+  三座小島 link 北海道/石川/長崎); 推定/待實測 notes excluded.
 
-29 NUnit tests, all green. Same source files drop into the Unity Test Runner later.
+40 NUnit tests, all green. Same source files drop into the Unity Test Runner later.
 
 ---
 
@@ -82,12 +87,21 @@ both paths compile the identical `Assets/Scripts/Game.Core/**` + `Game.Tests/**`
 
 **To verify** (first Unity open after this change):
 
-1. Open the project — Unity resolves the new **UniTask** package (git URL in
-   `Packages/manifest.json`, pinned to 2.5.10; needs network on first resolve).
+1. Open the project — Unity resolves the **UniTask** package (git URL in
+   `Packages/manifest.json`, pinned to 2.5.11; needs network on first resolve).
 2. Open `Assets/Scenes/Main.unity`, press **Play** → day-by-day summaries in the Console,
    ending with a unification message (seed 12345 → same run every time).
-3. `Window > General > Test Runner` (EditMode) → 29 tests still green.
+3. `Window > General > Test Runner` (EditMode) → 40 tests still green.
 
-Next: map view — `PrefectureDef` ScriptableObjects from `docs/adjacency_draft.csv` + clickable
+Next: map view — `PrefectureDef` ScriptableObjects fed by `AdjacencyLoader` + clickable
 prefecture sprites (MVP plan §四 steps 3–4). See
 [docs/unity-setup-sequence.md](docs/unity-setup-sequence.md) for how the project was brought in.
+
+---
+
+## Unity version
+
+Scaffolded on **6.5** (6000.5.2f1, tech stream) — already forced a UniTask bump when Unity 6.5
+made `TreeViewItem` a hard-error obsolete. Migrating to **6.0 LTS** (6000.0.78f1) per the pin in
+[CLAUDE.md](CLAUDE.md) (LTS required before the Android/IL2CPP build; 6.3+ has known Gradle
+issues on Apple Silicon). Steps: [docs/unity-6.0-downgrade.md](docs/unity-6.0-downgrade.md).
