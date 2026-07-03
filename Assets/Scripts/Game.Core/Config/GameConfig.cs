@@ -13,5 +13,8 @@ namespace Game.Core.Config
         public int MaxUnitsPerLand { get; set; } = 25;
         public int StartMoney { get; set; } = 100;
         public int StartUnitsPerLand { get; set; } = 3;
+
+        /// <summary>Sword unit price — 待實測 (placeholder; calibrate in-game later).</summary>
+        public int HireCost { get; set; } = 20;
     }
 }
