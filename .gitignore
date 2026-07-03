@@ -1,1 +1,5 @@
 .DS_Store
+
+# dotnet dev-test harness artifacts
+scripts/dev-tests/bin/
+scripts/dev-tests/obj/
