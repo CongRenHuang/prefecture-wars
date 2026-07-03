@@ -19,7 +19,8 @@ A clean-room, open-source remake of the Flash strategy game **都道府県大戦
 | MVP plan + pseudo-code | ✅ done |
 | **Game.Core — pure-C# strategic layer** | ✅ implemented + tested (TDD) |
 | Pre-Unity `dotnet test` harness | ✅ 29 tests green |
-| Unity project scaffold (asmdefs, scenes, Test Runner) | ⏳ next — see [docs/unity-setup-sequence.md](docs/unity-setup-sequence.md) |
+| Unity project scaffold (asmdefs + Test Runner) | ✅ done — 29 tests green in EditMode too |
+| First scene bootstrap (Unity `IRandom`/`IGameLogger`, turn loop) | ⏳ next |
 | Presentation layer (BattleView, UI, object pool) | ⬜ not started |
 | Android build (IL2CPP + ARM64) | ⬜ not started |
 
@@ -62,12 +63,14 @@ cd scripts/dev-tests
 PATH="/usr/local/share/dotnet:$PATH" dotnet test
 ```
 
-Once the Unity project is scaffolded, the same tests also run via
-`Window > General > Test Runner` (EditMode).
+The same tests also run inside Unity via `Window > General > Test Runner` (EditMode) —
+both paths compile the identical `Assets/Scripts/Game.Core/**` + `Game.Tests/**` files.
 
 ---
 
 ## Next step
 
-Unity for Mac just downloaded → follow **[docs/unity-setup-sequence.md](docs/unity-setup-sequence.md)**
-to bring the project into the repo without breaking the pure-C# split or losing `.meta` files.
+Unity project is scaffolded (asmdefs enforce the pure-C# split, `.meta` files committed).
+Next: first scene bootstrap — Unity `IRandom`/`IGameLogger` implementations driving the
+`Game.Core` turn loop headless in-Editor. See
+[docs/unity-setup-sequence.md](docs/unity-setup-sequence.md) for how the project was brought in.
