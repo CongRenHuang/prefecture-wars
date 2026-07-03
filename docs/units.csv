@@ -1,0 +1,17 @@
+﻿unit_id,name_jp,role,price_yen,research_lv,attack_type,range_rank,move_rank,durability_rank,hire_normally,notes,confidence
+sword,剣玉,基礎近戰,,1,melee,8,2,6,TRUE,初期可雇用；開局每縣3隻；刀鍛冶每日產1,價格待實測
+bow,弓玉,基礎遠程,,1,ranged,1,2,10,TRUE,初期可雇用；耐久全兵種最低；命中精度第2,價格待實測
+shield,盾玉,純坦,,,none,-,(慢),3,TRUE,不可攻擊；防禦/耐久極高；當肉盾拖時間,價格/等級待實測
+spear,槍玉,長槍(攻擊+間距),40,,melee,6,2,6,TRUE,價格40円[確認]；盾玉+槍玉為經典組合,價格=確認
+heal,癒玉,治療,,,none,-,3,5,TRUE,不可攻擊；回復友軍HP,待實測
+repair,繕玉,修建,,,none,-,3,6,TRUE,不可攻擊；修復縣壁/縣砲,待實測
+ninja,忍玉,高速刺客,,4,melee_or_ranged,1(遠)/7(近),1,,TRUE,研究Lv4[確認]；可近可遠；全兵種移速最快；忍之里每2日產1,等級=確認
+fire,火玉,範圍爆破,,,ranged_aoe,1,4,6,TRUE,範圍爆炸；命中精度遠程中最低,待實測
+sniper,狙玉,超遠程狙擊,,,ranged,1,4,4,TRUE,攻擊力最高/裝填最慢；發射即命中(實質100%)[確認]；鐵砲鍛冶每3日產1,命中機制=確認
+cavalry,騎玉,精銳均衡,,,melee,9,4,2,TRUE,攻防耐久均衡的高級單位,待實測
+bone,骨玉,召喚雜兵,-,-,melee,10,5,9,FALSE,不可雇用；靈場每日3隻/墓地/闇之術產生；量大質低,確認
+giant,大玉,終極單位,-,-,melee_aoe,5,6(最遅),1,FALSE,不可雇用；大玉召喚陣於第15/30/45日各產1隻[確認]；3連擊約90傷[推定]；移速最遅、集中砲火下脆弱,召喚日=確認
+c_weak,弱い生き物,敵:雜兵,-,-,melee,9,,,FALSE,謎之島專屬；體當たり；可被洗腦策反,確認
+c_hard,固い生き物,敵:重坦,-,-,melee,10,,,FALSE,防禦/耐久超高,確認
+c_shock,痺れる生き物,敵:遠程,-,-,ranged,1,,,FALSE,雷擊遠程攻擊,確認
+c_boss,ボスな生き物,敵:BOSS,-,-,aoe_shockwave,,,0(最高),FALSE,本島固定；範圍衝擊波單發傷害極大；耐久推定10000+,耐久=推定

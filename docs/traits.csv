@@ -1,0 +1,11 @@
+﻿trait_id,name_jp,effect,is_terrain,confidence
+goldmine,金山,該地收入50→70円(說明文寫1.5倍為誤植),FALSE,確認
+shrine,神社,防守時敵方戰術效果減半,FALSE,確認
+forest,森林,防守時敵方間接(遠程)攻擊減半,TRUE,確認
+swamp,沼地,防守時敵方移速下降(最遅兵種幾乎不能動),TRUE,確認
+castle,城,防守時敵方近接/間接攻擊-30%(重之術不受影響),TRUE,確認
+river,河川,防守時敵方近接攻擊減半,TRUE,確認
+ninja_v,忍の里,每2日產1隻忍玉,FALSE,確認
+smith,刀鍛冶,每日產1隻剣玉,FALSE,確認
+reizyo,霊場,每日產3隻骨玉,FALSE,確認
+gunsmith,鉄砲鍛冶,每3日產1隻狙玉,FALSE,確認
