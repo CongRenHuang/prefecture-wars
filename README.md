@@ -20,7 +20,8 @@ A clean-room, open-source remake of the Flash strategy game **都道府県大戦
 | **Game.Core — pure-C# strategic layer** | ✅ implemented + tested (TDD) |
 | Pre-Unity `dotnet test` harness | ✅ 29 tests green |
 | Unity project scaffold (asmdefs + Test Runner) | ✅ done — 29 tests green in EditMode too |
-| First scene bootstrap (Unity `IRandom`/`IGameLogger`, turn loop) | ⏳ next |
+| First scene bootstrap (Unity `IRandom`/`IGameLogger`, turn loop) | ✅ done — verify in-Editor (see below) |
+| Map view (PrefectureDef SOs, clickable prefectures) | ⏳ next |
 | Presentation layer (BattleView, UI, object pool) | ⬜ not started |
 | Android build (IL2CPP + ARM64) | ⬜ not started |
 
@@ -68,9 +69,25 @@ both paths compile the identical `Assets/Scripts/Game.Core/**` + `Game.Tests/**`
 
 ---
 
-## Next step
+## First scene bootstrap (new)
 
-Unity project is scaffolded (asmdefs enforce the pure-C# split, `.meta` files committed).
-Next: first scene bootstrap — Unity `IRandom`/`IGameLogger` implementations driving the
-`Game.Core` turn loop headless in-Editor. See
+`Game.Presentation` now exists (asmdef references `Game.Core` + UniTask):
+
+- `Ports/UnityDebugLogger` — `IGameLogger` → `Debug.Log`; the only place logs cross into UnityEngine.
+- `Ports/UnityRandom` — `IRandom` → `UnityEngine.Random` adapter (global-state caveat documented;
+  the bootstrap defaults to Core's deterministic `SeededRandom`).
+- `Bootstrap/GameBootstrap` — builds the 5-prefecture minimap, injects the ports, and steps the
+  Core turn loop via **UniTask** (one day per interval, AI-driven) to unification, logging day
+  summaries to the Console. No visuals yet — headless on purpose.
+
+**To verify** (first Unity open after this change):
+
+1. Open the project — Unity resolves the new **UniTask** package (git URL in
+   `Packages/manifest.json`, pinned to 2.5.10; needs network on first resolve).
+2. Open `Assets/Scenes/Main.unity`, press **Play** → day-by-day summaries in the Console,
+   ending with a unification message (seed 12345 → same run every time).
+3. `Window > General > Test Runner` (EditMode) → 29 tests still green.
+
+Next: map view — `PrefectureDef` ScriptableObjects from `docs/adjacency_draft.csv` + clickable
+prefecture sprites (MVP plan §四 steps 3–4). See
 [docs/unity-setup-sequence.md](docs/unity-setup-sequence.md) for how the project was brought in.
