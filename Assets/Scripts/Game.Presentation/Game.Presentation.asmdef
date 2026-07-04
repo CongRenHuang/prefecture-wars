@@ -3,7 +3,8 @@
     "rootNamespace": "Game.Presentation",
     "references": [
         "Game.Core",
-        "UniTask"
+        "UniTask",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
