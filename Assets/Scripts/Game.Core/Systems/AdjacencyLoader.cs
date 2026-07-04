@@ -38,7 +38,8 @@ namespace Game.Core.Systems
         };
 
         public static IReadOnlyList<PrefectureData> FromCsv(
-            string csv, bool applyConfirmedDeviations = true)
+            string csv, bool applyConfirmedDeviations = true,
+            IReadOnlyDictionary<string, TraitType> traits = null)
         {
             if (csv == null) throw new ArgumentNullException(nameof(csv));
 
@@ -114,7 +115,10 @@ namespace Game.Core.Systems
                 var neighborIds = new int[adj[i].Count];
                 adj[i].CopyTo(neighborIds);
                 Array.Sort(neighborIds);
-                result[i] = new PrefectureData(i, names[i], neighborIds, TraitType.None);
+
+                var trait = TraitType.None;
+                if (traits != null && traits.TryGetValue(names[i], out var t)) trait = t;
+                result[i] = new PrefectureData(i, names[i], neighborIds, trait);
             }
             return result;
         }

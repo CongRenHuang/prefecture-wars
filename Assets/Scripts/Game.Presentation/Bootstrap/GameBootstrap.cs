@@ -35,6 +35,10 @@ namespace Game.Presentation.Bootstrap
         [Tooltip("Resources path (no extension) of the adjacency CSV used when Use Full Map is ON.")]
         [SerializeField] private string adjacencyResource = "adjacency_draft";
 
+        [Tooltip("Resources path (no extension) of the prefecture-trait CSV (goldmines etc.). " +
+                 "Trait income asymmetry is what breaks a symmetric map's stalemate.")]
+        [SerializeField] private string traitsResource = "prefecture_traits";
+
         [Tooltip("Optional: a MapView to color by faction ownership each day. Leave empty for " +
                  "headless (Console-only) play. For a matching overlay set Use Full Map ON " +
                  "(the MapView renders all 47 nodes).")]
@@ -156,10 +160,31 @@ namespace Game.Presentation.Bootstrap
                 return MiniMap();
             }
 
-            var map = AdjacencyLoader.FromCsv(csv.text);
+            var traits = LoadTraits();
+            var map = AdjacencyLoader.FromCsv(csv.text, applyConfirmedDeviations: true, traits: traits);
+            int goldmines = 0;
+            foreach (var p in map) if (p.Trait == TraitType.GoldMine) goldmines++;
             _log.Info($"[Bootstrap] Loaded {map.Count}-prefecture map from " +
-                      $"Resources/'{adjacencyResource}' (confirmed deviations applied).");
+                      $"Resources/'{adjacencyResource}' (confirmed deviations applied, " +
+                      $"{traits.Count} traits, {goldmines} goldmines).");
             return map;
+        }
+
+        /// <summary>
+        /// Prefecture traits (goldmines etc.) from Resources, keyed by name.
+        /// Missing asset → empty map (all None); the game still runs, just
+        /// symmetric (and prone to stalemate on a uniform map).
+        /// </summary>
+        private Dictionary<string, TraitType> LoadTraits()
+        {
+            var csv = Resources.Load<TextAsset>(traitsResource);
+            if (csv == null)
+            {
+                _log.Warn($"[Bootstrap] traits CSV Resources/'{traitsResource}' not found — " +
+                          "map will have no goldmines (symmetric, may stalemate).");
+                return new Dictionary<string, TraitType>();
+            }
+            return PrefectureTraitLoader.FromCsv(csv.text);
         }
 
         /// <summary>Same 5-prefecture map as FullGameSmokeTests — clean unification demo.</summary>
