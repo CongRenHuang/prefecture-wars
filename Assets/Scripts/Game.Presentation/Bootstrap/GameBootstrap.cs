@@ -7,6 +7,7 @@ using Game.Core.Data;
 using Game.Core.Ports;
 using Game.Core.State;
 using Game.Core.Systems;
+using Game.Presentation.Map;
 using Game.Presentation.Ports;
 using UnityEngine;
 
@@ -33,6 +34,11 @@ namespace Game.Presentation.Bootstrap
 
         [Tooltip("Resources path (no extension) of the adjacency CSV used when Use Full Map is ON.")]
         [SerializeField] private string adjacencyResource = "adjacency_draft";
+
+        [Tooltip("Optional: a MapView to color by faction ownership each day. Leave empty for " +
+                 "headless (Console-only) play. For a matching overlay set Use Full Map ON " +
+                 "(the MapView renders all 47 nodes).")]
+        [SerializeField] private MapView mapView;
 
         [Header("Simulation")]
         [Tooltip("Seed for the deterministic RNG — same seed, same game.")]
@@ -72,6 +78,8 @@ namespace Game.Presentation.Bootstrap
             _log.Info($"[Bootstrap] New game — {map.Count} prefectures, seed {seed}, " +
                       $"rng {(useUnityRandom ? "UnityRandom (non-replayable)" : "SeededRandom (deterministic)")}");
 
+            if (mapView != null) mapView.RefreshOwners(state); // day 0 ownership
+
             for (int day = 0; day < dayLimit; day++)
             {
                 ct.ThrowIfCancellationRequested();
@@ -80,6 +88,8 @@ namespace Game.Presentation.Bootstrap
                 foreach (var faction in state.Factions)
                     if (faction.IsAlive) ai.TakeTurn(state, faction.Id);
                 var outcome = turn.Settlement(state);
+
+                if (mapView != null) mapView.RefreshOwners(state);
 
                 _log.Info(DaySummary(state, map));
 

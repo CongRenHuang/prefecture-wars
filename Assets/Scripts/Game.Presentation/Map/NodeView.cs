@@ -3,8 +3,9 @@ using UnityEngine;
 namespace Game.Presentation.Map
 {
     /// <summary>
-    /// One prefecture node on the graph map. Holds its Core id/name and toggles
-    /// its tint when selected. Spawned entirely from code by <see cref="MapView"/>.
+    /// One prefecture node on the graph map. Holds its Core id/name, its owner
+    /// tint (base color) and a selection highlight. Spawned entirely from code by
+    /// <see cref="MapView"/>. Selection overrides the base color while active.
     /// </summary>
     public sealed class NodeView : MonoBehaviour
     {
@@ -14,6 +15,7 @@ namespace Game.Presentation.Map
         private SpriteRenderer _sr;
         private Color _baseColor;
         private Color _selectedColor;
+        private bool _selected;
 
         public void Init(int id, string prefName, SpriteRenderer sr,
             Color baseColor, Color selectedColor)
@@ -23,12 +25,26 @@ namespace Game.Presentation.Map
             _sr = sr;
             _baseColor = baseColor;
             _selectedColor = selectedColor;
-            SetSelected(false);
+            _selected = false;
+            Apply();
+        }
+
+        /// <summary>Owner/base tint. Takes effect immediately unless selected.</summary>
+        public void SetBaseColor(Color c)
+        {
+            _baseColor = c;
+            Apply();
         }
 
         public void SetSelected(bool selected)
         {
-            if (_sr != null) _sr.color = selected ? _selectedColor : _baseColor;
+            _selected = selected;
+            Apply();
+        }
+
+        private void Apply()
+        {
+            if (_sr != null) _sr.color = _selected ? _selectedColor : _baseColor;
         }
     }
 }

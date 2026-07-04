@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using Game.Core.Data;
+using Game.Core.State;
 using Game.Core.Systems;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
@@ -41,16 +42,24 @@ namespace Game.Presentation.Map
         [SerializeField] private bool frameCameraOnStart = true;
 
         private readonly List<NodeView> _nodes = new List<NodeView>();
+        private readonly Dictionary<int, NodeView> _byId = new Dictionary<int, NodeView>();
         private Sprite _circleSprite;
         private Material _lineMaterial;
         private Font _labelFont;
         private NodeView _selected;
         private IReadOnlyList<PrefectureData> _map;
+        private bool _built;
 
         private void Start() => Build();
 
-        private void Build()
+        /// <summary>
+        /// Builds the graph once. Idempotent — safe to call from Start() and from
+        /// a driver (e.g. GameBootstrap) that wants the nodes ready before its
+        /// first <see cref="RefreshOwners"/>.
+        /// </summary>
+        public void Build()
         {
+            if (_built) return;
             _map = LoadAdjacency();
             if (_map == null) return;
             var positions = LoadPositions();
@@ -83,11 +92,41 @@ namespace Game.Presentation.Map
             var nodeRoot = new GameObject("Nodes").transform;
             nodeRoot.SetParent(transform, false);
             for (int i = 0; i < _map.Count; i++)
-                _nodes.Add(CreateNode(nodeRoot, _map[i], world[i]));
+            {
+                var nv = CreateNode(nodeRoot, _map[i], world[i]);
+                _nodes.Add(nv);
+                _byId[_map[i].Id] = nv;
+            }
 
             if (frameCameraOnStart) FrameCamera(world);
+            _built = true;
 
             Debug.Log($"[MapView] Built {_map.Count} nodes, click a prefecture to select.");
+        }
+
+        /// <summary>
+        /// Recolors each node by its current owner faction. Builds the graph first
+        /// if needed. Prefectures absent from <paramref name="state"/> (e.g. a
+        /// 5-prefecture minimap driving the 47-node map) keep their default tint.
+        /// </summary>
+        public void RefreshOwners(GameState state)
+        {
+            if (!_built) Build();
+            if (state == null) return;
+            foreach (var land in state.Lands)
+                if (_byId.TryGetValue(land.DefId, out var nv))
+                    nv.SetBaseColor(FactionColor(land.OwnerFactionId));
+        }
+
+        /// <summary>
+        /// Deterministic per-faction color. Golden-ratio hue stepping spreads
+        /// adjacent faction ids far apart in hue so neighbors stay distinct.
+        /// </summary>
+        public static Color FactionColor(int factionId)
+        {
+            float h = (factionId * 0.61803398875f) % 1f;
+            if (h < 0f) h += 1f;
+            return Color.HSVToRGB(h, 0.65f, 0.95f);
         }
 
         // ---- spawning ----
