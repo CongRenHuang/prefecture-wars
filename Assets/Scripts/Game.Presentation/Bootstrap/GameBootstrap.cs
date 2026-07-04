@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using Cysharp.Threading.Tasks;
@@ -17,11 +18,22 @@ namespace Game.Presentation.Bootstrap
     /// factions AI-driven, day summaries in the Console. Proves the
     /// Core↔Presentation seam (injected IRandom/IGameLogger) inside Unity.
     ///
-    /// TODO(MVP-0 step 3): replace the hardcoded minimap with PrefectureDef
-    /// ScriptableObjects built from docs/adjacency_draft.csv.
+    /// TODO(MVP-0 step 3): replace the CSV/minimap loading here with
+    /// PrefectureDef ScriptableObjects once the map view needs sprites + traits.
     /// </summary>
     public sealed class GameBootstrap : MonoBehaviour
     {
+        [Header("Map")]
+        [Tooltip("ON = load the full 47-prefecture map from Resources/adjacency_draft.csv " +
+                 "via AdjacencyLoader. OFF = the 5-prefecture minimap (clean unification demo). " +
+                 "Note: the full map has 沖縄 isolated (no confirmed land link), so a 47-way " +
+                 "AI game currently can't unify and will hit the day limit — expected until " +
+                 "sea invasion is modelled.")]
+        [SerializeField] private bool useFullMap = false;
+
+        [Tooltip("Resources path (no extension) of the adjacency CSV used when Use Full Map is ON.")]
+        [SerializeField] private string adjacencyResource = "adjacency_draft";
+
         [Header("Simulation")]
         [Tooltip("Seed for the deterministic RNG — same seed, same game.")]
         [SerializeField] private int seed = 12345;
@@ -50,14 +62,14 @@ namespace Game.Presentation.Bootstrap
         private async UniTaskVoid RunGameAsync(CancellationToken ct)
         {
             var config = new GameConfig();
-            var map = MiniMap();
+            var map = LoadMap();
             IRandom rng = useUnityRandom ? new UnityRandom(seed) : new SeededRandom(seed);
 
             var state = GameFactory.NewGame(config, map, playerPrefectureId);
             var turn = new TurnSystem(config, map);
             var ai = new SimpleAi(config, map, rng);
 
-            _log.Info($"[Bootstrap] New game — {map.Length} prefectures, seed {seed}, " +
+            _log.Info($"[Bootstrap] New game — {map.Count} prefectures, seed {seed}, " +
                       $"rng {(useUnityRandom ? "UnityRandom (non-replayable)" : "SeededRandom (deterministic)")}");
 
             for (int day = 0; day < dayLimit; day++)
@@ -87,7 +99,7 @@ namespace Game.Presentation.Bootstrap
             _log.Warn($"[Bootstrap] Day limit ({dayLimit}) hit without unification — stalemate?");
         }
 
-        private static string DaySummary(GameState state, PrefectureData[] map)
+        private static string DaySummary(GameState state, IReadOnlyList<PrefectureData> map)
         {
             var sb = new StringBuilder();
             sb.Append("Day ").Append(state.Day).Append(" |");
@@ -110,14 +122,37 @@ namespace Game.Presentation.Bootstrap
             return sb.ToString();
         }
 
-        private static string WinnerName(GameState state, PrefectureData[] map)
+        private static string WinnerName(GameState state, IReadOnlyList<PrefectureData> map)
         {
             foreach (var faction in state.Factions)
                 if (faction.IsAlive) return map[faction.Id].Name;
             return "???";
         }
 
-        /// <summary>Same 5-prefecture map as FullGameSmokeTests — throwaway until PrefectureDef SOs exist.</summary>
+        /// <summary>
+        /// Full 47-map from Resources CSV when useFullMap is set (and the CSV loads),
+        /// else the 5-prefecture minimap. Falls back to the minimap with a warning
+        /// if the Resources asset is missing so Play never hard-fails.
+        /// </summary>
+        private IReadOnlyList<PrefectureData> LoadMap()
+        {
+            if (!useFullMap) return MiniMap();
+
+            var csv = Resources.Load<TextAsset>(adjacencyResource);
+            if (csv == null)
+            {
+                _log.Warn($"[Bootstrap] useFullMap ON but Resources/'{adjacencyResource}' " +
+                          "not found — falling back to the 5-prefecture minimap.");
+                return MiniMap();
+            }
+
+            var map = AdjacencyLoader.FromCsv(csv.text);
+            _log.Info($"[Bootstrap] Loaded {map.Count}-prefecture map from " +
+                      $"Resources/'{adjacencyResource}' (confirmed deviations applied).");
+            return map;
+        }
+
+        /// <summary>Same 5-prefecture map as FullGameSmokeTests — clean unification demo.</summary>
         private static PrefectureData[] MiniMap() => new[]
         {
             new PrefectureData(0, "北海道", new[] { 1 }, TraitType.GoldMine),
