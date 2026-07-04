@@ -22,8 +22,8 @@ A clean-room, open-source remake of the Flash strategy game **都道府県大戦
 | Unity project scaffold (asmdefs + Test Runner) | ✅ done — tests green in EditMode too |
 | First scene bootstrap (Unity `IRandom`/`IGameLogger`, turn loop) | ✅ done — verify in-Editor (see below) |
 | AdjacencyLoader — 47-prefecture map from CSV (symmetry + confirmed deviations) | ✅ done — TDD, real CSV verified |
-| **Downgrade Unity 6.5 → 6.0 LTS** | ⏳ in progress — see [docs/unity-6.0-downgrade.md](docs/unity-6.0-downgrade.md) |
-| Map view (PrefectureDef SOs, clickable prefectures) | ⬜ next |
+| **Downgrade Unity 6.5 → 6.0 LTS** | ✅ done — 6000.0.78f1, [guide](docs/unity-6.0-downgrade.md) |
+| Map view (PrefectureDef SOs, clickable prefectures) | ⏳ next |
 | Presentation layer (BattleView, UI, object pool) | ⬜ not started |
 | Android build (IL2CPP + ARM64) | ⬜ not started |
 
@@ -101,7 +101,8 @@ prefecture sprites (MVP plan §四 steps 3–4). See
 
 ## Unity version
 
-Scaffolded on **6.5** (6000.5.2f1, tech stream) — already forced a UniTask bump when Unity 6.5
-made `TreeViewItem` a hard-error obsolete. Migrating to **6.0 LTS** (6000.0.78f1) per the pin in
-[CLAUDE.md](CLAUDE.md) (LTS required before the Android/IL2CPP build; 6.3+ has known Gradle
-issues on Apple Silicon). Steps: [docs/unity-6.0-downgrade.md](docs/unity-6.0-downgrade.md).
+Now on **6.0 LTS** (6000.0.78f1), the pin in [CLAUDE.md](CLAUDE.md) (LTS required before the
+Android/IL2CPP build; 6.3+ has known Gradle issues on Apple Silicon, and 6.2 is no longer
+offered in Hub). Originally scaffolded on 6.5 tech stream — the downgrade and the three gotchas
+hit (phantom 6.5 built-in modules, 6.5-pinned 2D packages, 6.5-authored URP settings) are
+written up in [docs/unity-6.0-downgrade.md](docs/unity-6.0-downgrade.md).
