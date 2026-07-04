@@ -103,6 +103,52 @@ Include any `ProjectSettings/*.asset` the reimport touched. Do **not** commit `L
 
 ---
 
+## Gotchas hit during the 6.5 → 6.0 downgrade (real, in order)
+
+The clean-resolve in Step 4 does **not** "just work" — the 6.5 Hub baked 6.5-only
+packages/assets into the project. Three fixes were needed:
+
+### 1. Phantom 6.5 built-in modules
+
+Resolve failed with *"Package [com.unity.modules.X@1.0.0] cannot be found"* for:
+`adaptiveperformance`, `physicscore2d`, `vectorgraphics`. These are **built-in modules 6.5
+added** — they don't exist in 6.0, and built-ins are editor-locked (can't auto-downgrade like
+registry packages). **Fix:** delete those three lines from `Packages/manifest.json`.
+
+### 2. 2D packages pinned to 6.5 versions → compile errors in PackageCache
+
+After the resolve error cleared, Safe Mode appeared with compile errors **inside
+`Library/PackageCache/com.unity.2d.*`** (`EntityId`, `SpriteFitInfo`,
+`IsGPUSkinningEnabled`, `TileBase.OnEnable` not found). Our manifest pinned exact 6.5 versions
+(2d.animation 15.1.0, aseprite 5.0.3, …) whose code calls 6.5-only engine APIs. Guessing 6.0
+versions = a retry loop. **Fix (reliable):**
+- Create a throwaway **2D (URP)** project in Hub on **6000.0.78f1**.
+- Copy its `Packages/manifest.json` over ours — it uses the meta-package
+  **`com.unity.feature.2d`** (e.g. `2.0.1`) which pulls the correct 6.0 2D versions
+  transitively — then re-add our extras (the UniTask git line; Input System is already in the
+  template).
+- Delete `Packages/packages-lock.json` + `Library/` so Unity re-resolves fresh.
+
+Other registry versions came down too: URP 17.6.0 → **17.0.4**, ugui 2.5.0 → 2.0.0,
+test-framework 1.7.0 → 1.6.0.
+
+### 3. URP settings assets authored by 6.5 → "Missing types" warning
+
+`Assets/UniversalRenderPipelineGlobalSettings.asset` (and `DefaultVolumeProfile.asset`) were
+serialized by 6.5 URP and referenced 6.5-only types (`PathTracing`, `Vrs`, `UnifiedRayTracing`,
+`URPTerrainShaderSetting`, …) absent in 6.0 URP 17.0.4. Benign for a 2D game, but the asset is
+half-broken. **Fix (keeps GUIDs so `ProjectSettings/GraphicsSettings.asset` stays wired):**
+- Overwrite the two `.asset` **bodies** with the 6.0 temp project's versions, but **keep our
+  `.meta`** files (preserves our GUIDs).
+- The copied GlobalSettings body references the *temp's* volume-profile GUID internally —
+  rewrite it back to *our* volume-profile GUID (the one our `.meta` keeps).
+
+Note: the 6.0 2D template also ships `Assets/Settings/UniversalRP.asset` + `Renderer2D.asset`
+(the actual pipeline + 2D renderer) which our 6.5 scaffold never had. Not needed until the map
+view renders something — add them from the template when visuals start.
+
+---
+
 ## Rollback
 
 If 6.0 misbehaves: quit, `git checkout ProjectSettings/ Packages/packages-lock.json`, delete
