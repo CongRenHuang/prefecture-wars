@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Game.Core.Config;
 using Game.Core.Data;
@@ -7,9 +8,15 @@ using Game.Core.State;
 namespace Game.Core.Systems
 {
     /// <summary>
-    /// MVP-0 AI (MVP doc §四): per own land, attack the weakest adjacent enemy
-    /// land when strictly stronger (leaving 1 unit home); otherwise spend money
-    /// hiring at home. Utility-function AI replaces this in MVP-2.
+    /// MVP-0 AI (MVP doc §四): coordinated attacks — pool the garrisons of ALL
+    /// own lands adjacent to a target, hit the weakest capturable enemy land,
+    /// repeat with the lands not yet used; leftover lands hire at home.
+    ///
+    /// Why pooled and not per-land: with the 25-unit land cap and the keep-1-home
+    /// rule, a single land can send at most 24, so a capped defender (25) is
+    /// mathematically uncrackable and the endgame deadlocks. Pooling two border
+    /// lands (24+24=48) breaks that wall while staying inside the MVP-0
+    /// number-compare model. Utility-function AI replaces this in MVP-2.
     /// </summary>
     public class SimpleAi
     {
@@ -32,47 +39,89 @@ namespace Game.Core.Systems
             for (int i = 0; i < state.Lands.Count; i++)
                 if (state.Lands[i].OwnerFactionId == factionId) ownedAtStart.Add(i);
 
-            foreach (int i in ownedAtStart)
-            {
-                if (state.Lands[i].OwnerFactionId != factionId) continue; // lost meanwhile
+            // Keep attacking while a capturable target exists; each source land
+            // contributes at most once per day (grayed-out rule).
+            var used = new HashSet<int>();
+            while (TryCoordinatedAttack(state, factionId, ownedAtStart, used)) { }
 
-                if (!TryAttackFrom(state, factionId, i))
+            // Lands that didn't join an attack spend money hiring at home.
+            foreach (int i in ownedAtStart)
+                if (!used.Contains(i))
                     HireAtHome(state, factionId, i);
-            }
         }
 
-        private bool TryAttackFrom(GameState state, int factionId, int landIndex)
+        /// <summary>
+        /// One pooled attack: weakest adjacent enemy land the faction can beat
+        /// with the combined sendable garrison (each source keeps 1 home).
+        /// Returns false when no capturable target remains.
+        /// </summary>
+        private bool TryCoordinatedAttack(
+            GameState state, int factionId, List<int> ownedAtStart, HashSet<int> used)
         {
-            var land = state.Lands[landIndex];
-            int sendable = land.Garrison - 1; // always keep 1 home
-            if (sendable <= 0) return false;
+            // target land index -> own unused source land indices (ascending, deterministic)
+            var sourcesByTarget = new Dictionary<int, List<int>>();
+            var targetOrder = new List<int>(); // stable iteration order for determinism
+            foreach (int i in ownedAtStart)
+            {
+                if (used.Contains(i)) continue;
+                var land = state.Lands[i];
+                if (land.Garrison <= 1) continue;
 
-            // Collect the weakest adjacent enemy lands (ties kept for random pick).
+                foreach (int neighborId in _prefectures[land.DefId].NeighborIds)
+                {
+                    var target = FindLandByDefId(state, neighborId);
+                    if (target == null || state.Lands[target.Value].OwnerFactionId == factionId)
+                        continue;
+
+                    if (!sourcesByTarget.TryGetValue(target.Value, out var sources))
+                    {
+                        sourcesByTarget[target.Value] = sources = new List<int>();
+                        targetOrder.Add(target.Value);
+                    }
+                    sources.Add(i);
+                }
+            }
+
+            // Weakest capturable targets (ties kept for random pick).
             var weakest = new List<int>();
             int weakestGarrison = int.MaxValue;
-            foreach (int neighborId in _prefectures[land.DefId].NeighborIds)
+            foreach (int t in targetOrder)
             {
-                var target = FindLandByDefId(state, neighborId);
-                if (target == null || state.Lands[target.Value].OwnerFactionId == factionId) continue;
+                int combined = 0;
+                foreach (int s in sourcesByTarget[t]) combined += state.Lands[s].Garrison - 1;
 
-                int g = state.Lands[target.Value].Garrison;
+                int g = state.Lands[t].Garrison;
+                if (combined <= g) continue;
                 if (g < weakestGarrison)
                 {
                     weakestGarrison = g;
                     weakest.Clear();
-                    weakest.Add(target.Value);
+                    weakest.Add(t);
                 }
                 else if (g == weakestGarrison)
                 {
-                    weakest.Add(target.Value);
+                    weakest.Add(t);
                 }
             }
-
-            if (weakest.Count == 0 || sendable <= weakestGarrison) return false;
+            if (weakest.Count == 0) return false;
 
             int chosen = weakest[_rng.Next(0, weakest.Count)];
-            land.Garrison = 1;
-            InvasionResolver.Resolve(factionId, sendable, state.Lands[chosen]);
+
+            // Send everything available, clamped so the surviving remnant can't
+            // exceed the per-land cap (25-unit cap is a confirmed rule).
+            int quota = state.Lands[chosen].Garrison + _config.MaxUnitsPerLand;
+            int sent = 0;
+            foreach (int s in sourcesByTarget[chosen])
+            {
+                if (sent >= quota) break;
+                int take = Math.Min(state.Lands[s].Garrison - 1, quota - sent);
+                if (take <= 0) continue;
+                state.Lands[s].Garrison -= take;
+                sent += take;
+                used.Add(s); // attacked today — grayed out even if partially drained
+            }
+
+            InvasionResolver.Resolve(factionId, sent, state.Lands[chosen]);
             return true;
         }
 

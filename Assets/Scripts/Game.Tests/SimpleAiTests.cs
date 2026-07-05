@@ -87,5 +87,77 @@ namespace Game.Tests
             Assert.Less(state.Factions[0].Money, 100);
             Assert.Greater(state.Lands[0].Garrison, 2);
         }
+
+        // ---- coordinated (pooled) attacks ----
+
+        // Two own lands both adjacent to one enemy land; enemy adjacent back.
+        private static (SimpleAi ai, GameState state) BuildPincerWorld(
+            int sourceA, int sourceB, int defenders)
+        {
+            var prefectures = new[]
+            {
+                new PrefectureData(0, "本陣A", new[] { 2 }, TraitType.None),
+                new PrefectureData(1, "本陣B", new[] { 2 }, TraitType.None),
+                new PrefectureData(2, "敵縣", new[] { 0, 1 }, TraitType.None),
+            };
+            var state = new GameState
+            {
+                Factions =
+                {
+                    new Faction { Id = 0, Money = 0, IsAlive = true, IsPlayer = false },
+                    new Faction { Id = 1, Money = 0, IsAlive = true, IsPlayer = false },
+                },
+                Lands =
+                {
+                    new LandState { DefId = 0, OwnerFactionId = 0, Garrison = sourceA },
+                    new LandState { DefId = 1, OwnerFactionId = 0, Garrison = sourceB },
+                    new LandState { DefId = 2, OwnerFactionId = 1, Garrison = defenders },
+                },
+            };
+            var ai = new SimpleAi(new GameConfig(), prefectures, new FakeRandom());
+            return (ai, state);
+        }
+
+        [Test]
+        public void TakeTurn_PoolsAdjacentLands_ToCrackCappedDefender()
+        {
+            // Endgame deadlock case: everything at the 25 cap. One land can send
+            // only 24 (< 25), but pooling both sends 48.
+            var (ai, state) = BuildPincerWorld(sourceA: 25, sourceB: 25, defenders: 25);
+
+            ai.TakeTurn(state, factionId: 0);
+
+            Assert.AreEqual(0, state.Lands[2].OwnerFactionId, "pooled 48 must beat 25");
+            Assert.AreEqual(23, state.Lands[2].Garrison); // 48 - 25 remnant
+            Assert.AreEqual(1, state.Lands[0].Garrison);  // both sources drained to 1
+            Assert.AreEqual(1, state.Lands[1].Garrison);
+        }
+
+        [Test]
+        public void TakeTurn_PooledRemnant_NeverExceedsLandCap()
+        {
+            // 24+24 available vs 1 defender: unclamped remnant would be 47.
+            // Quota = defenders + cap → sent 26, remnant exactly 25.
+            var (ai, state) = BuildPincerWorld(sourceA: 25, sourceB: 25, defenders: 1);
+
+            ai.TakeTurn(state, factionId: 0);
+
+            Assert.AreEqual(0, state.Lands[2].OwnerFactionId);
+            Assert.AreEqual(25, state.Lands[2].Garrison, "remnant must respect the 25 cap");
+            Assert.AreEqual(1, state.Lands[0].Garrison);   // first source fully drained
+            Assert.AreEqual(23, state.Lands[1].Garrison);  // second only gave the 2 needed
+        }
+
+        [Test]
+        public void TakeTurn_SingleLandStillCannotCrackCap_WithoutAHelper()
+        {
+            // Only one source at the cap: 24 vs 25 stays impossible (rule intact).
+            var (ai, state) = BuildPincerWorld(sourceA: 25, sourceB: 1, defenders: 25);
+
+            ai.TakeTurn(state, factionId: 0);
+
+            Assert.AreEqual(1, state.Lands[2].OwnerFactionId, "24 > 25 must stay false");
+            Assert.AreEqual(25, state.Lands[2].Garrison);
+        }
     }
 }
