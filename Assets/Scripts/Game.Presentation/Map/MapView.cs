@@ -41,6 +41,9 @@ namespace Game.Presentation.Map
         [SerializeField] private bool showLabels = true;
         [SerializeField] private bool frameCameraOnStart = true;
 
+        /// <summary>Fired with the prefecture id whenever a node is clicked.</summary>
+        public event System.Action<int> NodeClicked;
+
         private readonly List<NodeView> _nodes = new List<NodeView>();
         private readonly Dictionary<int, NodeView> _byId = new Dictionary<int, NodeView>();
         private Sprite _circleSprite;
@@ -241,7 +244,17 @@ namespace Game.Presentation.Map
             var hit = Physics2D.OverlapPoint(worldPoint);
             if (hit == null) return;
             var node = hit.GetComponent<NodeView>();
-            if (node != null) Select(node);
+            if (node == null) return;
+
+            Select(node);
+            NodeClicked?.Invoke(node.Id);
+        }
+
+        /// <summary>Drop the selection highlight (e.g. after an invasion resolves).</summary>
+        public void ClearSelection()
+        {
+            if (_selected != null) _selected.SetSelected(false);
+            _selected = null;
         }
 
         private void Select(NodeView node)

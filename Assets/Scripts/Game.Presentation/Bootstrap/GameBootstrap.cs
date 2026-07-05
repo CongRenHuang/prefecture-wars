@@ -11,6 +11,9 @@ using Game.Presentation.Defs;
 using Game.Presentation.Map;
 using Game.Presentation.Ports;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace Game.Presentation.Bootstrap
 {
@@ -57,9 +60,9 @@ namespace Game.Presentation.Bootstrap
         [Tooltip("OFF = Core SeededRandom (replayable). ON = UnityRandom adapter (global state, NOT replayable — see UnityRandom docs).")]
         [SerializeField] private bool useUnityRandom = false;
 
-        [Tooltip("Which prefecture the 'player' faction starts on. -1 = spectator: no player " +
-                 "faction, the AI game runs to true unification instead of stopping the moment " +
-                 "one arbitrary faction dies. (AI plays every faction either way for now.)")]
+        [Tooltip("Which prefecture the player faction starts on (0-46; playable: click your " +
+                 "land, then an adjacent enemy to invade, Space ends your turn). " +
+                 "-1 = spectator: all-AI, runs to true unification.")]
         [SerializeField] private int playerPrefectureId = -1;
 
         [Header("Pacing")]
@@ -71,9 +74,17 @@ namespace Game.Presentation.Bootstrap
 
         private IGameLogger _log;
 
+        // Player-phase state (only used when a player faction exists).
+        private readonly HashSet<int> _actedToday = new HashSet<int>();
+        private GameState _state;
+        private IReadOnlyList<PrefectureData> _mapData;
+        private bool _playerPhase;
+        private int _selectedSource = -1;
+
         private void Start()
         {
             _log = new UnityDebugLogger();
+            if (mapView != null) mapView.NodeClicked += OnNodeClicked;
             RunGameAsync(destroyCancellationToken).Forget();
         }
 
@@ -86,6 +97,8 @@ namespace Game.Presentation.Bootstrap
             var state = GameFactory.NewGame(config, map, playerPrefectureId);
             var turn = new TurnSystem(config, map);
             var ai = new SimpleAi(config, map, rng);
+            _state = state;
+            _mapData = map;
 
             _log.Info($"[Bootstrap] New game — {map.Count} prefectures, seed {seed}, " +
                       $"rng {(useUnityRandom ? "UnityRandom (non-replayable)" : "SeededRandom (deterministic)")}");
@@ -98,7 +111,11 @@ namespace Game.Presentation.Bootstrap
 
                 turn.StartNewDay(state);
                 foreach (var faction in state.Factions)
-                    if (faction.IsAlive) ai.TakeTurn(state, faction.Id);
+                {
+                    if (!faction.IsAlive) continue;
+                    if (faction.IsPlayer) await PlayerPhaseAsync(config, state, faction.Id, ct);
+                    else ai.TakeTurn(state, faction.Id);
+                }
                 var outcome = turn.Settlement(state);
 
                 if (mapView != null) mapView.RefreshOwners(state);
@@ -141,6 +158,114 @@ namespace Game.Presentation.Bootstrap
                   .Append(faction.Money).Append("円 |");
             }
             return sb.ToString();
+        }
+
+        // ---- player phase (click-to-invade) ----
+
+        /// <summary>
+        /// Blocks the turn loop until the player presses Space. Clicks are
+        /// handled by OnNodeClicked while _playerPhase is true. Afterwards
+        /// every player land that didn't attack auto-hires (same policy the
+        /// AI uses at home).
+        /// </summary>
+        private async UniTask PlayerPhaseAsync(
+            GameConfig config, GameState state, int factionId, CancellationToken ct)
+        {
+            _actedToday.Clear();
+            _selectedSource = -1;
+            _playerPhase = true;
+            _log.Info($"[Player] Day {state.Day}: click your land, then an adjacent enemy " +
+                      "to invade. Space = end your turn.");
+
+            while (!EndTurnPressed())
+            {
+                ct.ThrowIfCancellationRequested();
+                await UniTask.Yield(ct);
+            }
+            _playerPhase = false;
+
+            for (int i = 0; i < state.Lands.Count; i++)
+            {
+                var land = state.Lands[i];
+                if (land.OwnerFactionId != factionId || _actedToday.Contains(land.DefId)) continue;
+                int hired = PlayerCommands.HireMax(config, state, factionId, i);
+                if (hired > 0)
+                    _log.Info($"[Player] {_mapData[land.DefId].Name}: hired {hired} (auto).");
+            }
+
+            if (mapView != null)
+            {
+                mapView.ClearSelection();
+                mapView.RefreshOwners(state);
+            }
+        }
+
+        private void OnNodeClicked(int defId)
+        {
+            if (!_playerPhase || _state == null) return;
+            int factionId = playerPrefectureId; // faction ids are prefecture ids
+
+            // Clicking an own land (re)selects the invasion source.
+            LandState clicked = null;
+            foreach (var land in _state.Lands)
+                if (land.DefId == defId) { clicked = land; break; }
+            if (clicked == null) return;
+
+            if (clicked.OwnerFactionId == factionId)
+            {
+                if (_actedToday.Contains(defId))
+                    _log.Info($"[Player] {_mapData[defId].Name} already acted today.");
+                else if (clicked.Garrison < 2)
+                    _log.Info($"[Player] {_mapData[defId].Name} needs at least 2 units (1 stays home).");
+                else
+                {
+                    _selectedSource = defId;
+                    _log.Info($"[Player] {_mapData[defId].Name} selected — " +
+                              $"{clicked.Garrison - 1} units ready. Click an adjacent enemy.");
+                }
+                return;
+            }
+
+            if (_selectedSource < 0)
+            {
+                _log.Info("[Player] Select one of your own lands first.");
+                return;
+            }
+
+            var err = PlayerCommands.TryInvade(
+                _state, _mapData, factionId, _selectedSource, defId, _actedToday, out var result);
+            switch (err)
+            {
+                case PlayerCommands.InvadeError.None:
+                    _log.Info(result.Captured
+                        ? $"[Player] Captured {_mapData[defId].Name}! " +
+                          $"{result.AttackerSurvivors} units garrison it."
+                        : $"[Player] Attack on {_mapData[defId].Name} repelled.");
+                    _selectedSource = -1;
+                    if (mapView != null)
+                    {
+                        mapView.ClearSelection();
+                        mapView.RefreshOwners(_state);
+                    }
+                    break;
+                case PlayerCommands.InvadeError.NotAdjacent:
+                    _log.Info($"[Player] {_mapData[defId].Name} is not adjacent to " +
+                              $"{_mapData[_selectedSource].Name}.");
+                    break;
+                default:
+                    _log.Info($"[Player] Can't invade: {err}.");
+                    break;
+            }
+        }
+
+        private static bool EndTurnPressed()
+        {
+#if ENABLE_INPUT_SYSTEM
+            var kb = Keyboard.current;
+            return kb != null && kb.spaceKey.wasPressedThisFrame;
+#else
+            return Input.GetKeyDown(KeyCode.Space);
+#endif
         }
 
         /// <summary>Honest per-outcome end message — a player death is not a unification.</summary>
