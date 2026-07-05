@@ -7,6 +7,7 @@ using Game.Core.Data;
 using Game.Core.Ports;
 using Game.Core.State;
 using Game.Core.Systems;
+using Game.Presentation.Defs;
 using Game.Presentation.Map;
 using Game.Presentation.Ports;
 using UnityEngine;
@@ -38,6 +39,11 @@ namespace Game.Presentation.Bootstrap
         [Tooltip("Resources path (no extension) of the prefecture-trait CSV (goldmines etc.). " +
                  "Trait income asymmetry is what breaks a symmetric map's stalemate.")]
         [SerializeField] private string traitsResource = "prefecture_traits";
+
+        [Tooltip("Optional: PrefectureDef assets (Tools > Prefecture Wars > Generate). " +
+                 "When non-empty this takes priority over the CSV/minimap paths — " +
+                 "MapBuilder copies the SOs into runtime PrefectureData.")]
+        [SerializeField] private PrefectureDef[] prefectureDefs;
 
         [Tooltip("Optional: a MapView to color by faction ownership each day. Leave empty for " +
                  "headless (Console-only) play. For a matching overlay set Use Full Map ON " +
@@ -176,6 +182,14 @@ namespace Game.Presentation.Bootstrap
         /// </summary>
         private IReadOnlyList<PrefectureData> LoadMap()
         {
+            // Priority 1: PrefectureDef assets (the eventual MVP path).
+            if (prefectureDefs != null && prefectureDefs.Length > 0)
+            {
+                var built = MapBuilder.Build(prefectureDefs);
+                _log.Info($"[Bootstrap] Built {built.Count}-prefecture map from PrefectureDef assets.");
+                return built;
+            }
+
             if (!useFullMap) return MiniMap();
 
             var csv = Resources.Load<TextAsset>(adjacencyResource);
