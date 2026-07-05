@@ -51,8 +51,10 @@ namespace Game.Presentation.Bootstrap
         [Tooltip("OFF = Core SeededRandom (replayable). ON = UnityRandom adapter (global state, NOT replayable — see UnityRandom docs).")]
         [SerializeField] private bool useUnityRandom = false;
 
-        [Tooltip("Which prefecture the 'player' faction starts on (log flavour only — AI plays every faction for now).")]
-        [SerializeField] private int playerPrefectureId = 0;
+        [Tooltip("Which prefecture the 'player' faction starts on. -1 = spectator: no player " +
+                 "faction, the AI game runs to true unification instead of stopping the moment " +
+                 "one arbitrary faction dies. (AI plays every faction either way for now.)")]
+        [SerializeField] private int playerPrefectureId = -1;
 
         [Header("Pacing")]
         [Tooltip("Real seconds between simulated days. 0 = as fast as possible.")]
@@ -99,8 +101,7 @@ namespace Game.Presentation.Bootstrap
 
                 if (outcome != GameOutcome.Ongoing)
                 {
-                    _log.Info($"[Bootstrap] Day {state.Day}: {outcome} — " +
-                              $"{WinnerName(state, map)} unified the map.");
+                    _log.Info($"[Bootstrap] Day {state.Day}: {EndMessage(outcome, state, map)}");
                     return;
                 }
 
@@ -136,11 +137,36 @@ namespace Game.Presentation.Bootstrap
             return sb.ToString();
         }
 
-        private static string WinnerName(GameState state, IReadOnlyList<PrefectureData> map)
+        /// <summary>Honest per-outcome end message — a player death is not a unification.</summary>
+        private string EndMessage(GameOutcome outcome, GameState state, IReadOnlyList<PrefectureData> map)
         {
-            foreach (var faction in state.Factions)
-                if (faction.IsAlive) return map[faction.Id].Name;
-            return "???";
+            switch (outcome)
+            {
+                case GameOutcome.PlayerVictory:
+                    return $"PlayerVictory — {map[playerPrefectureId].Name}(P) unified the map.";
+
+                case GameOutcome.PlayerDefeated:
+                {
+                    int alive = 0;
+                    foreach (var faction in state.Factions)
+                        if (faction.IsAlive) alive++;
+                    // Faction ids are prefecture ids, so the player's home land is DefId == playerPrefectureId.
+                    string conqueror = "???";
+                    foreach (var land in state.Lands)
+                        if (land.DefId == playerPrefectureId)
+                        { conqueror = map[land.OwnerFactionId].Name; break; }
+                    return $"PlayerDefeated — {map[playerPrefectureId].Name}(P) was eliminated " +
+                           $"({conqueror} holds its home); {alive} factions still fighting.";
+                }
+
+                case GameOutcome.Unified:
+                    foreach (var faction in state.Factions)
+                        if (faction.IsAlive) return $"Unified — {map[faction.Id].Name} owns all {state.Lands.Count} lands.";
+                    return "Unified — ???";
+
+                default:
+                    return outcome.ToString();
+            }
         }
 
         /// <summary>

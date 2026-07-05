@@ -83,5 +83,66 @@ namespace Game.Tests
 
             Assert.AreEqual(GameOutcome.PlayerVictory, result);
         }
+
+        // ---- spectator games (no player faction) ----
+
+        private static void MakeSpectator(GameState state)
+        {
+            foreach (var faction in state.Factions) faction.IsPlayer = false;
+        }
+
+        [Test]
+        public void Settlement_Spectator_OneFactionOwnsAll_Unified()
+        {
+            var (turn, state) = BuildWorld();
+            MakeSpectator(state);
+            state.Lands[0].OwnerFactionId = 1;
+            state.Lands[2].OwnerFactionId = 1;
+
+            var result = turn.Settlement(state);
+
+            Assert.AreEqual(GameOutcome.Unified, result);
+        }
+
+        [Test]
+        public void Settlement_Spectator_MultipleAlive_Ongoing()
+        {
+            var (turn, state) = BuildWorld();
+            MakeSpectator(state);
+            state.Lands[2].OwnerFactionId = 1; // faction 2 eliminated, 0+1 remain
+
+            var result = turn.Settlement(state);
+
+            Assert.IsFalse(state.Factions[2].IsAlive);
+            Assert.AreEqual(GameOutcome.Ongoing, result);
+        }
+
+        [Test]
+        public void Settlement_PlayerGame_AiOwnsAll_IsPlayerDefeated_NotUnified()
+        {
+            var (turn, state) = BuildWorld();
+            state.Lands[0].OwnerFactionId = 1;
+            state.Lands[2].OwnerFactionId = 1;
+
+            var result = turn.Settlement(state);
+
+            Assert.AreEqual(GameOutcome.PlayerDefeated, result,
+                "with a player faction, an AI sweep reports the player's loss, not Unified");
+        }
+
+        [Test]
+        public void NewGame_NegativePlayerId_YieldsSpectatorGame()
+        {
+            var prefectures = new[]
+            {
+                new PrefectureData(0, "甲縣", new[] { 1 }, TraitType.None),
+                new PrefectureData(1, "乙縣", new[] { 0 }, TraitType.None),
+            };
+
+            var state = GameFactory.NewGame(new GameConfig(), prefectures, playerPrefectureId: -1);
+
+            foreach (var faction in state.Factions)
+                Assert.IsFalse(faction.IsPlayer);
+        }
     }
 }

@@ -49,12 +49,22 @@ namespace Game.Core.Systems
                     faction.IsAlive = false;
             }
 
-            // Win/loss from the player's perspective.
+            // Win/loss from the player's perspective (if a player faction exists).
+            bool hasPlayer = false;
             foreach (var faction in state.Factions)
             {
                 if (!faction.IsPlayer) continue;
+                hasPlayer = true;
                 if (!faction.IsAlive) return GameOutcome.PlayerDefeated;
                 if (landCounts[faction.Id] == state.Lands.Count) return GameOutcome.PlayerVictory;
+            }
+
+            // Spectator game (no player): end when one faction owns everything.
+            if (!hasPlayer)
+            {
+                foreach (var faction in state.Factions)
+                    if (faction.IsAlive && landCounts[faction.Id] == state.Lands.Count)
+                        return GameOutcome.Unified;
             }
 
             return GameOutcome.Ongoing;

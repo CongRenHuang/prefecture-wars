@@ -8,6 +8,8 @@ namespace Game.Core.Systems
     /// <summary>
     /// Builds the confirmed start state: one faction per prefecture, each
     /// owning its own land with StartUnitsPerLand garrison and StartMoney.
+    /// Pass playerPrefectureId = -1 for a spectator (all-AI) game — no faction
+    /// is the player, and Settlement ends the game on true unification.
     /// </summary>
     public static class GameFactory
     {
