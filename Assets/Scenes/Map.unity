@@ -288,10 +288,11 @@ MonoBehaviour:
   useFullMap: 1
   adjacencyResource: adjacency_draft
   traitsResource: prefecture_traits
+  prefectureDefs: []
   mapView: {fileID: 1918795357}
   seed: 12345
   useUnityRandom: 0
-  playerPrefectureId: -1
+  playerPrefectureId: 12
   secondsPerDay: 0.25
   dayLimit: 500
 --- !u!4 &1754549484
